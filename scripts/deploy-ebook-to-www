@@ -45,8 +45,10 @@ die(){ printf "\033[0;7;31mError:\033[0m %s\n" "${1}" 1>&2; exit 1; }
 require(){ command -v "$1" > /dev/null 2>&1 || { suggestion=""; if [ -n "$2" ]; then suggestion=" $2"; fi; die "$1 is not installed.${suggestion}"; } }
 # End boilerplate
 
+echo "1"
+
 verbose="false"
-images="true"
+images="false"
 build="true"
 group="se"
 webRoot="/standardebooks.org/web/www"
@@ -125,11 +127,15 @@ if ! [ -d "${webRoot}" ]; then
 	die "${webRoot} does not exist or is not a directory."
 fi
 
+echo "2"
+
 # Check for dependencies
 require "convert" "Try: apt-get install imagemagick"
 require "git" "Try: apt-get install git"
 require "php" "Try: apt-get install php-cli"
 require "se" "Read: https://standardebooks.org/tools"
+
+echo "3"
 
 # cavif is compiled via Cargo: https://github.com/kornelski/cavif-rs
 
@@ -154,6 +160,7 @@ do
 	if [ "${dir}" = "" ]; then
 		continue
 	fi
+	echo "4"
 
 	repoDir=$(realpath "${dir%/}")
 	baseName=$(basename "${repoDir}")
@@ -218,6 +225,7 @@ do
 	webDir="${webRoot}/ebooks/${webDir}"
 
 	if [ "${images}" = "true" ]; then
+		echo "5"
 		if [ "${verbose}" = "true" ]; then
 			printf "Generating cover image for web ... "
 		fi
@@ -261,9 +269,11 @@ do
 		fi
 
 		popd > /dev/null || die "Couldn't pop directory."
+		echo "6"
 	fi
 
 	if [ "${build}" = "true" ]; then
+		echo "7"
 		if [ "${verbose}" = "true" ]; then
 			printf "Building ebook ... "
 		fi
@@ -284,6 +294,7 @@ do
 				die "Error building ebook, stopping deployment."
 			fi
 		fi
+		echo "8"
 
 		# Build distributable covers
 		convert -resize "1400" -sampling-factor 4:2:0 -strip -quality 80 -colorspace RGB -interlace JPEG "${workDir}/src/epub/images/cover.svg" ""${workDir}"/downloads/cover.jpg"
@@ -292,6 +303,7 @@ do
 		if [ "${verbose}" = "true" ]; then
 			printf "Done.\n"
 		fi
+		echo "9"
 
 		# Get the book URL
 		bookUrl=$(grep --only-matching --extended-regexp "<dc:identifier id=\"uid\">.+?</dc:identifier>" "${workDir}"/src/epub/content.opf | sed --regexp-extended "s/.*?url:https:\/\/standardebooks.org(.*?)<.*/\1/g")
@@ -323,6 +335,7 @@ do
 				printf "Done.\n"
 			fi
 		fi
+		echo "10"
 
 		# Make some compatibility adjustments for the individual XHTML files
 
@@ -374,6 +387,7 @@ do
 		mv "${workDir}"/downloads "${webDir}/"
 		rm "${workDir}/src/epub/onix.xml"
 		mv "${workDir}"/src/epub/* "${webDir}/"
+		echo "11"
 	fi
 
 	if [ "${images}" = "true" ]; then
@@ -397,7 +411,7 @@ queuedTasks="false"
 if tsp | grep --quiet --extended-regexp "^[0-9]+\s+queued"; then
 	queuedTasks="true"
 fi
-
+echo "12"
 if [ "${queuedTasks}" = "false" ]; then
 	if [ "${verbose}" = "true" ]; then
 		printf "Rebuilding web library cache ... "
@@ -414,49 +428,3 @@ else
 	fi
 fi
 
-if [ "${feeds}" = "true" ]; then
-	# Build the various feeds catalog, but only if we don't have more items in the tsp build queue.
-	if [ "${queuedTasks}" = "false" ]; then
-		if [ "${verbose}" = "true" ]; then
-			printf "Building feeds ... "
-		fi
-
-		"${scriptsDir}/generate-feeds" --webroot "${webRoot}" --weburl "${webUrl}"
-		"${scriptsDir}"/rebuild-cache feeds
-
-		if [ "${verbose}" = "true" ]; then
-			printf "Done.\n"
-		fi
-	else
-		if [ "${verbose}" = "true" ]; then
-			printf "Tasks queued after this one, not building feeds.\n"
-		fi
-	fi
-fi
-
-if [ "${bulkDownloads}" = "true" ]; then
-	# Build the various feeds catalog, but only if we don't have more items in the tsp build queue.
-	if [ "${queuedTasks}" = "false" ]; then
-		if [ "${verbose}" = "true" ]; then
-			printf "Building bulk downloads ... "
-		fi
-
-		output=$("${scriptsDir}/generate-bulk-downloads" --webroot "${webRoot}")
-		if [ "${verbose}" = "true" ]; then
-			echo "${output}"
-		fi
-		"${scriptsDir}"/rebuild-cache bulk-downloads
-
-		if [ "${verbose}" = "true" ]; then
-			printf "Done.\n"
-		fi
-	else
-		if [ "${verbose}" = "true" ]; then
-			printf "Tasks queued after this one, not building bulk downloads.\n"
-		fi
-	fi
-fi
-
-if [ "${verbose}" = "true" ]; then
-	printf "Finished processing ebook.\n"
-fi
